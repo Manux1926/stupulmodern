@@ -1,0 +1,40 @@
+name: Build and deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.dep.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build site
+        run: |
+          SID="${{ github.event.repository.name }}"
+          mkdir -p src
+          curl -fsSL https://raw.githubusercontent.com/Manux1926/dronaagricola/main/build.py -o src/build.py
+          cp site_*.py src/
+          cd src && python3 build.py "$SID"
+          cd .. && touch "out/$SID/.nojekyll"
+          if [ -f CNAME ]; then cp CNAME "out/$SID/"; fi
+          if ls google*.html >/dev/null 2>&1; then cp google*.html "out/$SID/"; fi
+          echo "SID=$SID" >> "$GITHUB_ENV"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out/${{ env.SID }}
+      - id: dep
+        uses: actions/deploy-pages@v4
